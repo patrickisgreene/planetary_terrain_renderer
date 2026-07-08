@@ -6,8 +6,8 @@ edition = "2024"
 [dependencies]
 bevy_terrain = { path = ".." }
 gag = "1.0.0"
-gdal = { version = "0.17.0", features = ["bindgen", "ndarray"] }
-gdal-sys = "0.10.0"
+gdal = { version = "0.19.0", features = ["bindgen", "ndarray"] }
+gdal-sys = "0.12.0"
 glam = "0.29.2"
 itertools = "0.14.0"
 thiserror = "2.0.8"
@@ -16,7 +16,7 @@ rayon = "1.10.0"
 thread_local = "1.1.8"
 clap = { version = "4.5.17", features = ["derive"] }
 indicatif = { version = "0.17.8", features = ["rayon"] }
-ndarray = "0.15"
+ndarray = "0.17"
 
 [lints.rust]
 unexpected_cfgs = { level = "warn", check-cfg = ['cfg(gdal_major_ge_3)', 'cfg(gdal_major_ge_4)', 'cfg(gdal_minor_ge_5)', 'cfg(gdal_minor_ge_7)'] }
@@ -24,4 +24,3 @@ unexpected_cfgs = { level = "warn", check-cfg = ['cfg(gdal_major_ge_3)', 'cfg(gd
 [[example]]
 name = "preprocess_spherical"
 path = "examples/preprocess_spherical.rs"
-
