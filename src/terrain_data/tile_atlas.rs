@@ -11,16 +11,13 @@ use crate::{
 };
 use bevy::{
     asset::RenderAssetUsages,
+    camera::visibility::{VisibilityClass, add_visibility_class},
     platform::collections::{HashMap, HashSet},
     prelude::*,
-    render::{
-        render_resource::*,
-        storage::ShaderStorageBuffer,
-        view::{VisibilityClass, add_visibility_class},
-    },
+    render::{render_resource::*, storage::ShaderStorageBuffer},
     tasks::Task,
 };
-use big_space::prelude::GridCell;
+use big_space::prelude::*;
 use std::collections::VecDeque;
 
 /// The current state of a tile of a [`TileAtlas`].
@@ -60,7 +57,7 @@ struct TileState {
 /// The [`u32`] can be used for accessing the attached data in systems by the CPU
 /// and in shaders by the GPU.
 #[derive(Component)]
-#[require(Transform, GridCell, Visibility, VisibilityClass, DefaultLoader)]
+#[require(Transform, CellCoord, Visibility, VisibilityClass, DefaultLoader)]
 #[component(on_add = add_visibility_class::<TileAtlas>)]
 pub struct TileAtlas {
     pub(crate) attachments: HashMap<AttachmentLabel, Attachment>, // stores the attachment data

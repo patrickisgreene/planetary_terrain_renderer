@@ -9,7 +9,7 @@ use crate::{
 use bevy::{
     prelude::*,
     render::{Extract, RenderApp, render_resource::*},
-    window::PrimaryWindow,
+    window::{CursorOptions, PrimaryWindow},
 };
 
 mod approximation_debug;
@@ -18,11 +18,6 @@ mod orbital_camera;
 
 pub(crate) use self::{approximation_debug::*, camera::*, orbital_camera::*};
 pub use self::{camera::DebugCameraController, orbital_camera::OrbitalCameraController};
-
-#[cfg(feature = "metal_capture")]
-mod metal_capture;
-#[cfg(feature = "metal_capture")]
-pub use self::metal_capture::MetalCapturePlugin;
 
 #[derive(Asset, AsBindGroup, TypePath, Clone, Default)]
 pub struct DebugTerrainMaterial {}
@@ -52,8 +47,6 @@ impl Plugin for TerrainDebugPlugin {
                 Last,
                 debug_surface_approximation.after(TileTree::generate_surface_approximation),
             );
-        #[cfg(feature = "metal_capture")]
-        app.add_plugins(MetalCapturePlugin);
 
         app.sub_app_mut(RenderApp)
             .init_resource::<DebugTerrain>()
@@ -312,9 +305,9 @@ pub(crate) fn debug_lighting(mut commands: Commands) {
     });
 }
 
-pub fn debug_window(mut window: Query<&mut Window, With<PrimaryWindow>>) {
-    let mut window = window.single_mut().unwrap();
-    window.cursor_options.visible = true; // false;
+pub fn debug_window(mut options: Query<&mut CursorOptions, With<PrimaryWindow>>) {
+    let mut cursor_options = options.single_mut().unwrap();
+    cursor_options.visible = true; // false;
 }
 
 #[derive(Resource, Default)]

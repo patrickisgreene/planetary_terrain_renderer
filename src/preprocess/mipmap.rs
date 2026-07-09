@@ -12,6 +12,7 @@ use bevy::{
         render_resource::{binding_types::*, *},
         renderer::{RenderContext, RenderDevice},
     },
+    shader::ShaderDefVal,
 };
 use strum::IntoEnumIterator;
 
@@ -92,7 +93,7 @@ impl SpecializedComputePipeline for MipPipelines {
             push_constant_ranges: default(),
             shader: self.mip_shader.clone(),
             shader_defs: key.shader_defs(),
-            entry_point: "main".into(),
+            entry_point: Some("main".into()),
             zero_initialize_workgroup_memory: false,
         }
     }

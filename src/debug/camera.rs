@@ -44,7 +44,7 @@ pub fn debug_camera_controller(
     grids: Grids,
     time: Res<Time>,
     keyboard: Res<ButtonInput<KeyCode>>,
-    mut mouse_move: EventReader<MouseMotion>,
+    mut mouse_move: MessageReader<MouseMotion>,
     mut camera: Query<(Entity, CellTransform, &mut DebugCameraController)>,
 ) {
     let Ok((

@@ -5,7 +5,7 @@ use crate::{
 use bevy::{
     asset::RenderAssetUsages,
     core_pipeline::core_3d::graph::Core3d,
-    ecs::{component::HookContext, query::QueryItem, world::DeferredWorld},
+    ecs::{lifecycle::HookContext, query::QueryItem, world::DeferredWorld},
     prelude::*,
     render::{
         RenderApp,
@@ -13,7 +13,7 @@ use bevy::{
         gpu_readback::{Readback, ReadbackComplete},
         render_asset::RenderAssets,
         render_graph::{
-            self, NodeRunError, RenderGraphApp, RenderGraphContext, RenderLabel, ViewNodeRunner,
+            self, NodeRunError, RenderGraphContext, RenderGraphExt, RenderLabel, ViewNodeRunner,
         },
         render_resource::{
             binding_types::{
@@ -31,7 +31,7 @@ use big_space::prelude::*;
 pub fn picking_system(
     mut buffers: ResMut<Assets<ShaderStorageBuffer>>,
     window: Query<&Window, With<PrimaryWindow>>,
-    camera: Query<(&Camera, &GlobalTransform, &GridCell, &PickingData)>,
+    camera: Query<(&Camera, &GlobalTransform, &CellCoord, &PickingData)>,
 ) {
     let Ok(window) = window.single() else {
         return;
@@ -47,17 +47,14 @@ pub fn picking_system(
             cursor_coords,
             depth: 0.0,
             stencil: 255,
-            world_from_clip: global_transform.compute_matrix() * camera.clip_from_view().inverse(),
+            world_from_clip: global_transform.to_matrix() * camera.clip_from_view().inverse(),
             cell: IVec3::new(cell.x, cell.y, cell.z),
         };
         buffer.set_data(data);
     }
 }
 
-pub fn picking_readback(
-    trigger: Trigger<ReadbackComplete>,
-    mut picking_data: Query<&mut PickingData>,
-) {
+pub fn picking_readback(trigger: On<ReadbackComplete>, mut picking_data: Query<&mut PickingData>) {
     let GpuPickingData {
         cursor_coords,
         depth,
@@ -68,9 +65,9 @@ pub fn picking_readback(
 
     let ndc_coords = (2.0 * cursor_coords - 1.0).extend(depth);
 
-    let mut picking_data = picking_data.get_mut(trigger.target()).unwrap();
+    let mut picking_data = picking_data.get_mut(trigger.entity).unwrap();
     picking_data.cursor_coords = cursor_coords;
-    picking_data.cell = GridCell::new(cell.x, cell.y, cell.z);
+    picking_data.cell = CellCoord::new(cell.x, cell.y, cell.z);
     picking_data.translation = (depth > 0.0).then(|| world_from_clip.project_point3(ndc_coords));
     picking_data.world_from_clip = world_from_clip;
 
@@ -91,7 +88,7 @@ pub fn picking_hook(mut world: DeferredWorld, context: HookContext) {
     world
         .commands()
         .entity(context.entity)
-        .insert(Readback::buffer(buffer.clone_weak()))
+        .insert(Readback::buffer(buffer.clone()))
         .observe(picking_readback);
 
     let mut picking_data = world.get_mut::<PickingData>(context.entity).unwrap();
@@ -102,7 +99,7 @@ pub fn picking_hook(mut world: DeferredWorld, context: HookContext) {
 #[component(on_add = picking_hook)]
 pub struct PickingData {
     pub cursor_coords: Vec2,
-    pub cell: GridCell,            // cell of floating origin (camera)
+    pub cell: CellCoord,           // cell of floating origin (camera)
     pub translation: Option<Vec3>, // relative to floating origin cell
     pub world_from_clip: Mat4,
     buffer: Handle<ShaderStorageBuffer>,
@@ -113,7 +110,7 @@ impl ExtractComponent for PickingData {
     type QueryFilter = ();
     type Out = GpuPickingBuffer;
 
-    fn extract_component(data: QueryItem<'_, Self::QueryData>) -> Option<Self::Out> {
+    fn extract_component(data: QueryItem<'_, '_, Self::QueryData>) -> Option<Self::Out> {
         Some(GpuPickingBuffer(data.buffer.id()))
     }
 }
@@ -159,7 +156,7 @@ impl FromWorld for PickingPipeline {
             push_constant_ranges: Vec::new(),
             shader: world.load_asset(PICKING_SHADER),
             shader_defs: vec![],
-            entry_point: "pick".into(),
+            entry_point: Some("pick".into()),
             zero_initialize_workgroup_memory: false,
         });
 
@@ -173,11 +170,11 @@ pub struct PickingPass;
 impl render_graph::ViewNode for PickingPass {
     type ViewQuery = (&'static GpuPickingBuffer, &'static TerrainViewDepthTexture);
 
-    fn run<'w>(
+    fn run<'w, 's>(
         &self,
         _graph: &mut RenderGraphContext,
         context: &mut RenderContext<'w>,
-        (picking_buffer, depth): QueryItem<'w, Self::ViewQuery>,
+        (picking_buffer, depth): QueryItem<'w, 's, Self::ViewQuery>,
         world: &'w World,
     ) -> Result<(), NodeRunError> {
         let pipeline_cache = world.resource::<PipelineCache>();
@@ -224,7 +221,7 @@ impl Plugin for TerrainPickingPlugin {
     fn build(&self, app: &mut App) {
         app.add_systems(
             PostUpdate,
-            picking_system.after(TransformSystem::TransformPropagate),
+            picking_system.after(TransformSystems::Propagate),
         )
         .add_plugins(ExtractComponentPlugin::<PickingData>::default());
 

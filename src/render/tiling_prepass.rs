@@ -17,6 +17,7 @@ use bevy::{
         render_resource::*,
         renderer::{RenderContext, RenderDevice},
     },
+    shader::ShaderDefVal,
 };
 
 bitflags::bitflags! {
@@ -170,7 +171,7 @@ impl SpecializedComputePipeline for TerrainTilingPrepassPipelines {
                 self.terrain_layout.clone(),
             ];
             shader = self.refine_tiles_shader.clone();
-            entry_point = "refine_tiles".into();
+            entry_point = Some("refine_tiles".into());
         }
         if key.contains(TilingPrepassPipelineKey::PREPARE_ROOT) {
             layout = vec![
@@ -179,7 +180,7 @@ impl SpecializedComputePipeline for TerrainTilingPrepassPipelines {
                 self.indirect_layout.clone(),
             ];
             shader = self.prepare_prepass_shader.clone();
-            entry_point = "prepare_root".into();
+            entry_point = Some("prepare_root".into());
         }
         if key.contains(TilingPrepassPipelineKey::PREPARE_NEXT) {
             layout = vec![
@@ -188,7 +189,7 @@ impl SpecializedComputePipeline for TerrainTilingPrepassPipelines {
                 self.indirect_layout.clone(),
             ];
             shader = self.prepare_prepass_shader.clone();
-            entry_point = "prepare_next".into();
+            entry_point = Some("prepare_next".into());
         }
         if key.contains(TilingPrepassPipelineKey::PREPARE_RENDER) {
             layout = vec![
@@ -197,7 +198,7 @@ impl SpecializedComputePipeline for TerrainTilingPrepassPipelines {
                 self.indirect_layout.clone(),
             ];
             shader = self.prepare_prepass_shader.clone();
-            entry_point = "prepare_render".into();
+            entry_point = Some("prepare_render".into());
         }
 
         ComputePipelineDescriptor {

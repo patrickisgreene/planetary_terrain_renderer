@@ -7,11 +7,11 @@ use crate::{
 };
 use bevy::{
     asset::RenderAssetUsages,
+    camera::primitives::Frustum,
     math::{DVec2, DVec3},
     prelude::*,
     render::{
         gpu_readback::{Readback, ReadbackComplete},
-        primitives::Frustum,
         render_resource::{BufferUsages, ShaderType},
         storage::ShaderStorageBuffer,
     },
@@ -166,7 +166,7 @@ impl TileTree {
         commands
             .spawn((
                 TerrainViewKey(terrain_view),
-                Readback::buffer(approximate_height_buffer.clone_weak()),
+                Readback::buffer(approximate_height_buffer.clone()),
             ))
             .observe(Self::approximate_height_readback);
 
@@ -327,7 +327,7 @@ impl TileTree {
         camera: Query<&Camera>,
         mut tile_trees: ResMut<TerrainViewComponents<TileTree>>,
         grids: Grids,
-        views: Query<(&Transform, &GridCell)>,
+        views: Query<(&Transform, &CellCoord)>,
     ) {
         for (&(_, view), tile_tree) in tile_trees.iter_mut() {
             let camera = camera.get(view).unwrap();
@@ -337,7 +337,7 @@ impl TileTree {
             // Todo: transform should be global transform?
 
             let clip_from_view = camera.clip_from_view();
-            let world_from_view = transform.compute_matrix();
+            let world_from_view = transform.to_matrix();
             let clip_from_world = clip_from_view * world_from_view.inverse();
 
             let half_spaces = Frustum::from_clip_from_world(&clip_from_world)
@@ -395,11 +395,11 @@ impl TileTree {
     }
 
     pub fn approximate_height_readback(
-        trigger: Trigger<ReadbackComplete>,
+        trigger: On<ReadbackComplete>,
         terrain_view: Query<&TerrainViewKey>,
         mut tile_trees: ResMut<TerrainViewComponents<TileTree>>,
     ) {
-        let TerrainViewKey(terrain_view) = terrain_view.get(trigger.target()).unwrap();
+        let TerrainViewKey(terrain_view) = terrain_view.get(trigger.entity).unwrap();
         let tile_tree = tile_trees.get_mut(terrain_view).unwrap();
         tile_tree.approximate_height = trigger.event().to_shader_type();
     }

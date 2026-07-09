@@ -285,10 +285,10 @@ impl<const I: usize, P: PhaseItem> RenderCommand<P> for SetTerrainViewBindGroup<
     type ItemQuery = ();
 
     #[inline]
-    fn render<'w>(
+    fn render<'w, 's>(
         item: &P,
-        view: ROQueryItem<'w, Self::ViewQuery>,
-        _: Option<ROQueryItem<'w, Self::ItemQuery>>,
+        view: ROQueryItem<'w, 's, Self::ViewQuery>,
+        _: Option<ROQueryItem<'w, 's, Self::ItemQuery>>,
         gpu_terrain_views: SystemParamItem<'w, '_, Self::Param>,
         pass: &mut TrackedRenderPass<'w>,
     ) -> RenderCommandResult {
@@ -311,10 +311,10 @@ impl<P: PhaseItem> RenderCommand<P> for DrawTerrainCommand {
     type ItemQuery = ();
 
     #[inline]
-    fn render<'w>(
+    fn render<'w, 's>(
         item: &P,
-        view: ROQueryItem<'w, Self::ViewQuery>,
-        _: Option<ROQueryItem<'w, Self::ItemQuery>>,
+        view: ROQueryItem<'w, 's, Self::ViewQuery>,
+        _: Option<ROQueryItem<'w, 's, Self::ItemQuery>>,
         gpu_terrain_views: SystemParamItem<'w, '_, Self::Param>,
         pass: &mut TrackedRenderPass<'w>,
     ) -> RenderCommandResult {
