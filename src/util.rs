@@ -147,10 +147,11 @@ impl<T: ShaderType + WriteInto> GpuBuffer<T> {
 
     pub fn update(&mut self, queue: &RenderQueue) {
         if let Some(value) = &self.value {
+            let bytes = self.buffer_type.write_vec(value);
             let mut buffer = queue
                 .write_buffer_with(&self.buffer, 0, value.size())
                 .unwrap();
-            self.buffer_type.write(value, &mut buffer);
+            buffer.copy_from_slice(&bytes);
         }
     }
 }

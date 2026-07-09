@@ -1,10 +1,10 @@
 use crate::{
     formats::TiffLoader,
-    preprocess::{MipPipelines, MipPrepass},
+    preprocess::{MipPipelines, mip_prepass},
     render::{
-        DepthCopyPipeline, GpuTerrain, GpuTerrainView, TerrainItem, TerrainPass,
-        TerrainTilingPrepassPipelines, TilingPrepass, TilingPrepassItem, extract_terrain_phases,
-        prepare_terrain_depth_textures, queue_tiling_prepass,
+        DepthCopyPipeline, GpuTerrain, GpuTerrainView, TerrainItem, TerrainTilingPrepassPipelines,
+        TilingPrepassItem, extract_terrain_phases, prepare_terrain_depth_textures,
+        queue_tiling_prepass, terrain_pass, tiling_prepass,
     },
     shaders::{InternalShaders, load_terrain_shaders},
     terrain::{TerrainComponents, TerrainConfig},
@@ -14,14 +14,13 @@ use crate::{
     terrain_view::TerrainViewComponents,
 };
 use bevy::{
-    core_pipeline::core_3d::graph::{Core3d, Node3d},
+    core_pipeline::{Core3dSystems, core_3d::main_opaque_pass_3d, schedule::Core3d},
     prelude::*,
     render::{
         Render, RenderApp, RenderSystems,
-        graph::CameraDriverLabel,
-        render_graph::{RenderGraph, RenderGraphExt, ViewNodeRunner},
         render_phase::{DrawFunctions, ViewSortedRenderPhases, sort_phase_system},
         render_resource::*,
+        renderer::{RenderGraph, RenderGraphSystems},
     },
 };
 use bevy_common_assets::ron::RonAssetPlugin;
@@ -128,20 +127,18 @@ impl Plugin for TerrainPlugin {
                         .in_set(RenderSystems::Cleanup),
                 ),
             )
-            .add_render_graph_node::<ViewNodeRunner<TerrainPass>>(Core3d, TerrainPass)
-            .add_render_graph_edges(
+            .add_systems(
                 Core3d,
-                (Node3d::StartMainPass, TerrainPass, Node3d::MainOpaquePass),
+                terrain_pass
+                    .before(main_opaque_pass_3d)
+                    .in_set(Core3dSystems::MainPass),
+            )
+            .add_systems(
+                RenderGraph,
+                (mip_prepass, tiling_prepass)
+                    .chain()
+                    .in_set(RenderGraphSystems::Begin),
             );
-
-        let mut render_graph = app
-            .sub_app_mut(RenderApp)
-            .world_mut()
-            .resource_mut::<RenderGraph>();
-        render_graph.add_node(MipPrepass, MipPrepass);
-        render_graph.add_node(TilingPrepass, TilingPrepass);
-        render_graph.add_node_edge(MipPrepass, TilingPrepass);
-        render_graph.add_node_edge(TilingPrepass, CameraDriverLabel);
     }
 
     fn finish(&self, app: &mut App) {

@@ -13,7 +13,7 @@ use bevy::{
     render::{
         gpu_readback::{Readback, ReadbackComplete},
         render_resource::{BufferUsages, ShaderType},
-        storage::ShaderStorageBuffer,
+        storage::ShaderBuffer,
     },
 };
 use big_space::prelude::*;
@@ -129,9 +129,9 @@ pub struct TileTree {
     pub(crate) approximate_height: f32,
     pub(crate) order: u32,
 
-    pub(crate) tile_tree_buffer: Handle<ShaderStorageBuffer>,
-    pub(crate) terrain_view_buffer: Handle<ShaderStorageBuffer>,
-    pub(crate) approximate_height_buffer: Handle<ShaderStorageBuffer>,
+    pub(crate) tile_tree_buffer: Handle<ShaderBuffer>,
+    pub(crate) terrain_view_buffer: Handle<ShaderBuffer>,
+    pub(crate) approximate_height_buffer: Handle<ShaderBuffer>,
 }
 
 impl TileTree {
@@ -141,7 +141,7 @@ impl TileTree {
         view_config: &TerrainViewConfig,
         terrain_view: (Entity, Entity),
         commands: &mut Commands,
-        buffers: &mut Assets<ShaderStorageBuffer>, // Todo: solve this dependency with a component hook in the future
+        buffers: &mut Assets<ShaderBuffer>, // Todo: solve this dependency with a component hook in the future
     ) -> Self {
         let data = Array4::default((
             config.shape.face_count() as usize,
@@ -150,16 +150,16 @@ impl TileTree {
             view_config.tree_size as usize,
         ));
 
-        let terrain_view_buffer = buffers.add(ShaderStorageBuffer::with_size(
+        let terrain_view_buffer = buffers.add(ShaderBuffer::with_size(
             TerrainViewUniform::min_size().get() as usize,
             RenderAssetUsages::all(),
         ));
-        let tile_tree_buffer = buffers.add(ShaderStorageBuffer::with_size(
+        let tile_tree_buffer = buffers.add(ShaderBuffer::with_size(
             data.len() * size_of::<TileTreeEntry>(),
             RenderAssetUsages::all(),
         ));
 
-        let mut approximate_height_buffer = ShaderStorageBuffer::from(0.0);
+        let mut approximate_height_buffer = ShaderBuffer::from(0.0);
         approximate_height_buffer.buffer_description.usage |= BufferUsages::COPY_SRC;
         let approximate_height_buffer = buffers.add(approximate_height_buffer);
 
@@ -340,7 +340,7 @@ impl TileTree {
             let world_from_view = transform.to_matrix();
             let clip_from_world = clip_from_view * world_from_view.inverse();
 
-            let half_spaces = Frustum::from_clip_from_world(&clip_from_world)
+            let half_spaces = Frustum(ViewFrustum::from_clip_from_world(&clip_from_world))
                 .half_spaces
                 .map(|space| space.normal_d());
 
@@ -381,13 +381,16 @@ impl TileTree {
 
     pub fn update_terrain_view_buffer(
         tile_trees: Res<TerrainViewComponents<TileTree>>,
-        mut buffers: ResMut<Assets<ShaderStorageBuffer>>,
+        mut buffers: ResMut<Assets<ShaderBuffer>>,
     ) {
         for tile_tree in tile_trees.values() {
-            let terrain_view_buffer = buffers.get_mut(&tile_tree.terrain_view_buffer).unwrap();
-            terrain_view_buffer.set_data(TerrainViewUniform::from(tile_tree));
+            {
+                let mut terrain_view_buffer =
+                    buffers.get_mut(&tile_tree.terrain_view_buffer).unwrap();
+                terrain_view_buffer.set_data(TerrainViewUniform::from(tile_tree));
+            }
 
-            let tile_tree_buffer = buffers.get_mut(&tile_tree.tile_tree_buffer).unwrap();
+            let mut tile_tree_buffer = buffers.get_mut(&tile_tree.tile_tree_buffer).unwrap();
             tile_tree_buffer.set_data(TileTreeUniform {
                 entries: tile_tree.data.clone().into_iter().collect_vec(),
             });

@@ -48,7 +48,7 @@ impl AssetLoader for TiffLoader {
                 depth_or_array_layers: 1,
             },
             TextureDimension::D2,
-            TextureFormat::bevy_default(),
+            TextureFormat::Rgba8UnormSrgb,
             RenderAssetUsages::MAIN_WORLD,
         );
 

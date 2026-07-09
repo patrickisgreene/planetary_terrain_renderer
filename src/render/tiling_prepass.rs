@@ -13,7 +13,6 @@ use crate::{
 use bevy::{
     prelude::*,
     render::{
-        render_graph::{self, RenderLabel},
         render_resource::*,
         renderer::{RenderContext, RenderDevice},
     },
@@ -204,7 +203,7 @@ impl SpecializedComputePipeline for TerrainTilingPrepassPipelines {
         ComputePipelineDescriptor {
             label: Some("tiling_prepass_pipeline".into()),
             layout,
-            push_constant_ranges: default(),
+            immediate_size: Default::default(),
             shader,
             shader_defs,
             entry_point,
@@ -213,83 +212,65 @@ impl SpecializedComputePipeline for TerrainTilingPrepassPipelines {
     }
 }
 
-#[derive(Debug, Hash, PartialEq, Eq, Clone, RenderLabel)]
-pub struct TilingPrepass;
+pub(crate) fn tiling_prepass(world: &World, mut ctx: RenderContext) {
+    let prepass_items = world.resource::<TerrainViewComponents<TilingPrepassItem>>();
+    let pipeline_cache = world.resource::<PipelineCache>();
+    let gpu_terrains = world.resource::<TerrainComponents<GpuTerrain>>();
+    let gpu_terrain_views = world.resource::<TerrainViewComponents<GpuTerrainView>>();
+    let debug = world.get_resource::<DebugTerrain>();
 
-impl render_graph::Node for TilingPrepass {
-    fn run<'w>(
-        &self,
-        _graph: &mut render_graph::RenderGraphContext,
-        context: &mut RenderContext<'w>,
-        world: &'w World,
-    ) -> Result<(), render_graph::NodeRunError> {
-        let prepass_items = world.resource::<TerrainViewComponents<TilingPrepassItem>>();
-        let pipeline_cache = world.resource::<PipelineCache>();
-        let gpu_terrains = world.resource::<TerrainComponents<GpuTerrain>>();
-        let gpu_terrain_views = world.resource::<TerrainViewComponents<GpuTerrainView>>();
-        let debug = world.get_resource::<DebugTerrain>();
+    if debug.map(|debug| debug.freeze).unwrap_or(false) {
+        return;
+    }
 
-        if debug.map(|debug| debug.freeze).unwrap_or(false) {
-            return Ok(());
+    let mut pass = ctx
+        .command_encoder()
+        .begin_compute_pass(&ComputePassDescriptor::default());
+
+    for (&(terrain, view), prepass_item) in prepass_items.iter() {
+        let Some((
+            refine_tiles_pipeline,
+            prepare_root_pipeline,
+            prepare_next_pipeline,
+            prepare_render_pipeline,
+        )) = prepass_item.pipelines(pipeline_cache)
+        else {
+            continue;
+        };
+
+        let gpu_terrain = &gpu_terrains[&terrain];
+        let gpu_terrain_view = &gpu_terrain_views[&(terrain, view)];
+
+        let Some(terrain_bind_group) = &gpu_terrain.terrain_bind_group else {
+            continue;
+        };
+        let Some(prepass_view_bind_group) = &gpu_terrain_view.prepass_view_bind_group else {
+            continue;
+        };
+        let Some(indirect_bind_group) = &gpu_terrain_view.indirect_bind_group else {
+            continue;
+        };
+
+        pass.set_bind_group(0, prepass_view_bind_group, &[]);
+        pass.set_bind_group(1, terrain_bind_group, &[]);
+        pass.set_bind_group(2, indirect_bind_group, &[]);
+
+        pass.set_pipeline(prepare_root_pipeline);
+        pass.dispatch_workgroups(1, 1, 1);
+
+        for _ in 0..gpu_terrain_view.refinement_count {
+            pass.set_pipeline(refine_tiles_pipeline);
+            pass.dispatch_workgroups_indirect(&gpu_terrain_view.indirect_buffer, 0);
+
+            pass.set_pipeline(prepare_next_pipeline);
+            pass.dispatch_workgroups(1, 1, 1);
         }
 
-        context.add_command_buffer_generation_task(move |device| {
-            let mut encoder = device.create_command_encoder(&CommandEncoderDescriptor::default());
-            let mut pass = encoder.begin_compute_pass(&ComputePassDescriptor::default());
+        pass.set_pipeline(refine_tiles_pipeline);
+        pass.dispatch_workgroups_indirect(&gpu_terrain_view.indirect_buffer, 0);
 
-            for (&(terrain, view), prepass_item) in prepass_items.iter() {
-                let Some((
-                    refine_tiles_pipeline,
-                    prepare_root_pipeline,
-                    prepare_next_pipeline,
-                    prepare_render_pipeline,
-                )) = prepass_item.pipelines(pipeline_cache)
-                else {
-                    continue;
-                };
-
-                let gpu_terrain = &gpu_terrains[&terrain];
-                let gpu_terrain_view = &gpu_terrain_views[&(terrain, view)];
-
-                let Some(terrain_bind_group) = &gpu_terrain.terrain_bind_group else {
-                    continue;
-                };
-                let Some(prepass_view_bind_group) = &gpu_terrain_view.prepass_view_bind_group
-                else {
-                    continue;
-                };
-                let Some(indirect_bind_group) = &gpu_terrain_view.indirect_bind_group else {
-                    continue;
-                };
-
-                pass.set_bind_group(0, prepass_view_bind_group, &[]);
-                pass.set_bind_group(1, terrain_bind_group, &[]);
-                pass.set_bind_group(2, indirect_bind_group, &[]);
-
-                pass.set_pipeline(prepare_root_pipeline);
-                pass.dispatch_workgroups(1, 1, 1);
-
-                for _ in 0..gpu_terrain_view.refinement_count {
-                    pass.set_pipeline(refine_tiles_pipeline);
-                    pass.dispatch_workgroups_indirect(&gpu_terrain_view.indirect_buffer, 0);
-
-                    pass.set_pipeline(prepare_next_pipeline);
-                    pass.dispatch_workgroups(1, 1, 1);
-                }
-
-                pass.set_pipeline(refine_tiles_pipeline);
-                pass.dispatch_workgroups_indirect(&gpu_terrain_view.indirect_buffer, 0);
-
-                pass.set_pipeline(prepare_render_pipeline);
-                pass.dispatch_workgroups(1, 1, 1);
-            }
-
-            drop(pass);
-
-            encoder.finish()
-        });
-
-        Ok(())
+        pass.set_pipeline(prepare_render_pipeline);
+        pass.dispatch_workgroups(1, 1, 1);
     }
 }
 

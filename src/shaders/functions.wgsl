@@ -227,7 +227,7 @@ fn compute_tile_tree_uv(coordinate: Coordinate) -> vec2<f32> {
 
     let tile_count = i32(exp2(f32(coordinate.lod)));
     let tree_size  = min(i32(terrain_view.tree_size), tile_count);
-    let tree_xy    = vec2<i32>(view_coordinate.xy) + vec2<i32>(round(view_coordinate.uv)) - vec2<i32>(terrain_view.tree_size / 2);
+    let tree_xy    = vec2<i32>(view_coordinate.xy) + vec2<i32>(round(view_coordinate.uv)) - vec2<i32>(i32(terrain_view.tree_size / 2));
     let view_xy    = clamp(tree_xy, vec2<i32>(0), vec2<i32>(tile_count - tree_size));
 
     return (vec2<f32>(vec2<i32>(coordinate.xy) - view_xy) + coordinate.uv) / f32(tree_size);

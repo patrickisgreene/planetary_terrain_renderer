@@ -11,10 +11,13 @@ use crate::{
     terrain_view::TerrainViewComponents,
 };
 use bevy::{
-    pbr::{MeshPipeline, MeshPipelineViewLayoutKey, SetMaterialBindGroup, SetMeshViewBindGroup},
+    pbr::{
+        MeshPipeline, MeshPipelineSystems, MeshPipelineViewLayoutKey, SetMaterialBindGroup,
+        SetMeshViewBindGroup, ViewKeyCache,
+    },
     prelude::*,
     render::{
-        Render, RenderApp, RenderSystems,
+        Render, RenderApp, RenderStartup, RenderSystems,
         render_phase::{
             AddRenderCommand, DrawFunctions, PhaseItemExtraIndex, SetItemPipeline,
             ViewSortedRenderPhases,
@@ -31,6 +34,7 @@ use std::{hash::Hash, marker::PhantomData};
 #[derive(PartialEq, Eq, Clone, Hash)]
 pub struct TerrainPipelineKey {
     pub flags: TerrainPipelineFlags,
+    pub view_layout_key: MeshPipelineViewLayoutKey,
 }
 
 bitflags::bitflags! {
@@ -194,8 +198,7 @@ impl TerrainPipelineFlags {
 /// The pipeline used to render the terrain entities.
 #[derive(Resource)]
 pub struct TerrainRenderPipeline<M: Material> {
-    view_layout: BindGroupLayoutDescriptor,
-    view_layout_multisampled: BindGroupLayoutDescriptor,
+    mesh_pipeline: MeshPipeline,
     terrain_layout: BindGroupLayoutDescriptor,
     terrain_view_layout: BindGroupLayoutDescriptor,
     material_layout: BindGroupLayoutDescriptor,
@@ -204,41 +207,34 @@ pub struct TerrainRenderPipeline<M: Material> {
     marker: PhantomData<M>,
 }
 
-impl<M: Material> FromWorld for TerrainRenderPipeline<M> {
-    fn from_world(world: &mut World) -> Self {
-        let device = world.resource::<RenderDevice>();
-        let mesh_pipeline = world.resource::<MeshPipeline>();
-        let prepass_pipelines = world.resource::<TerrainTilingPrepassPipelines>();
+fn init_terrain_render_pipeline<M: Material>(
+    mut commands: Commands,
+    device: Res<RenderDevice>,
+    asset_server: Res<AssetServer>,
+    mesh_pipeline: Res<MeshPipeline>,
+    prepass_pipelines: Res<TerrainTilingPrepassPipelines>,
+) {
+    let vertex_shader = match M::vertex_shader() {
+        ShaderRef::Default => asset_server.load(DEFAULT_VERTEX_SHADER),
+        ShaderRef::Handle(handle) => handle,
+        ShaderRef::Path(path) => asset_server.load(path),
+    };
 
-        let vertex_shader = match M::vertex_shader() {
-            ShaderRef::Default => world.load_asset(DEFAULT_VERTEX_SHADER),
-            ShaderRef::Handle(handle) => handle,
-            ShaderRef::Path(path) => world.load_asset(path),
-        };
+    let fragment_shader = match M::fragment_shader() {
+        ShaderRef::Default => asset_server.load(DEFAULT_FRAGMENT_SHADER),
+        ShaderRef::Handle(handle) => handle,
+        ShaderRef::Path(path) => asset_server.load(path),
+    };
 
-        let fragment_shader = match M::fragment_shader() {
-            ShaderRef::Default => world.load_asset(DEFAULT_FRAGMENT_SHADER),
-            ShaderRef::Handle(handle) => handle,
-            ShaderRef::Path(path) => world.load_asset(path),
-        };
-
-        Self {
-            view_layout: mesh_pipeline
-                .get_view_layout(MeshPipelineViewLayoutKey::empty())
-                .main_layout
-                .clone(),
-            view_layout_multisampled: mesh_pipeline
-                .get_view_layout(MeshPipelineViewLayoutKey::MULTISAMPLED)
-                .main_layout
-                .clone(),
-            terrain_layout: prepass_pipelines.terrain_layout.clone(),
-            terrain_view_layout: prepass_pipelines.terrain_view_layout.clone(),
-            material_layout: M::bind_group_layout_descriptor(device),
-            vertex_shader,
-            fragment_shader,
-            marker: PhantomData,
-        }
-    }
+    commands.insert_resource(TerrainRenderPipeline::<M> {
+        mesh_pipeline: mesh_pipeline.clone(),
+        terrain_layout: prepass_pipelines.terrain_layout.clone(),
+        terrain_view_layout: prepass_pipelines.terrain_view_layout.clone(),
+        material_layout: M::bind_group_layout_descriptor(&device),
+        vertex_shader,
+        fragment_shader,
+        marker: PhantomData,
+    });
 }
 
 impl<M: Material> SpecializedRenderPipeline for TerrainRenderPipeline<M> {
@@ -247,13 +243,19 @@ impl<M: Material> SpecializedRenderPipeline for TerrainRenderPipeline<M> {
     fn specialize(&self, key: Self::Key) -> RenderPipelineDescriptor {
         let mut shader_defs = key.flags.shader_defs();
 
-        let mut bind_group_layout = match key.flags.msaa_samples() {
-            1 => vec![self.view_layout.clone()],
-            _ => {
-                shader_defs.push("MULTISAMPLED".into());
-                vec![self.view_layout_multisampled.clone()]
-            }
-        };
+        if key
+            .view_layout_key
+            .contains(MeshPipelineViewLayoutKey::MULTISAMPLED)
+        {
+            shader_defs.push("MULTISAMPLED".into());
+        }
+
+        let mut bind_group_layout = vec![
+            self.mesh_pipeline
+                .get_view_layout(key.view_layout_key)
+                .main_layout
+                .clone(),
+        ];
 
         bind_group_layout.push(self.terrain_layout.clone());
         bind_group_layout.push(self.terrain_view_layout.clone());
@@ -267,7 +269,7 @@ impl<M: Material> SpecializedRenderPipeline for TerrainRenderPipeline<M> {
         RenderPipelineDescriptor {
             label: None,
             layout: bind_group_layout,
-            push_constant_ranges: default(),
+            immediate_size: Default::default(),
             vertex: VertexState {
                 shader: self.vertex_shader.clone(),
                 entry_point: Some("vertex".into()),
@@ -288,15 +290,15 @@ impl<M: Material> SpecializedRenderPipeline for TerrainRenderPipeline<M> {
                 shader_defs: fragment_shader_defs,
                 entry_point: Some("fragment".into()),
                 targets: vec![Some(ColorTargetState {
-                    format: TextureFormat::bevy_default(),
+                    format: TextureFormat::Rgba8UnormSrgb,
                     blend: Some(BlendState::REPLACE),
                     write_mask: ColorWrites::ALL,
                 })],
             }),
             depth_stencil: Some(DepthStencilState {
                 format: TERRAIN_DEPTH_FORMAT,
-                depth_write_enabled: true,
-                depth_compare: CompareFunction::Greater,
+                depth_write_enabled: true.into(),
+                depth_compare: CompareFunction::Greater.into(),
                 stencil: StencilState {
                     front: StencilFaceState {
                         compare: CompareFunction::GreaterEqual,
@@ -342,6 +344,7 @@ pub(crate) fn queue_terrain<M: Material>(
     mut terrain_phases: ResMut<ViewSortedRenderPhases<TerrainItem>>,
     gpu_tile_atlases: Res<TerrainComponents<GpuTileAtlas>>,
     gpu_terrain_views: Res<TerrainViewComponents<GpuTerrainView>>,
+    view_key_cache: Res<ViewKeyCache>,
     mut views: Query<(MainEntity, &Msaa)>,
 ) where
     M::Data: PartialEq + Eq + Hash + Clone,
@@ -349,13 +352,21 @@ pub(crate) fn queue_terrain<M: Material>(
     let draw_function = draw_functions.read().get_id::<DrawTerrain>().unwrap();
 
     for (view, msaa) in &mut views {
-        let Some(terrain_phase) = terrain_phases.get_mut(&RetainedViewEntity {
+        let retained_view_entity = RetainedViewEntity {
             main_entity: view.into(),
             auxiliary_entity: Entity::PLACEHOLDER.into(),
             subview_index: 0,
-        }) else {
+        };
+
+        let Some(terrain_phase) = terrain_phases.get_mut(&retained_view_entity) else {
             continue;
         };
+
+        let view_layout_key = view_key_cache
+            .get(&retained_view_entity)
+            .copied()
+            .map(MeshPipelineViewLayoutKey::from)
+            .unwrap_or(MeshPipelineViewLayoutKey::empty());
 
         for (&terrain, gpu_tile_atlas) in gpu_tile_atlases.iter() {
             let Some(gpu_terrain_view) = gpu_terrain_views.get(&(terrain, view)) else {
@@ -376,11 +387,14 @@ pub(crate) fn queue_terrain<M: Material>(
                     | TerrainPipelineFlags::SAMPLE_GRAD;
             }
 
-            let key = TerrainPipelineKey { flags };
+            let key = TerrainPipelineKey {
+                flags,
+                view_layout_key,
+            };
 
             let pipeline = pipelines.specialize(&pipeline_cache, &terrain_pipeline, key);
 
-            terrain_phase.add(TerrainItem {
+            terrain_phase.add_transient(TerrainItem {
                 representative_entity: (terrain, terrain.into()), // technically wrong
                 draw_function,
                 pipeline,
@@ -416,13 +430,12 @@ where
             .add_render_command::<TerrainItem, DrawTerrain>()
             .init_resource::<SpecializedRenderPipelines<TerrainRenderPipeline<M>>>()
             .add_systems(
+                RenderStartup,
+                init_terrain_render_pipeline::<M>.after(MeshPipelineSystems),
+            )
+            .add_systems(
                 Render,
                 queue_terrain::<M>.in_set(RenderSystems::QueueMeshes),
             );
-    }
-
-    fn finish(&self, app: &mut App) {
-        app.sub_app_mut(RenderApp)
-            .init_resource::<TerrainRenderPipeline<M>>();
     }
 }

@@ -15,7 +15,7 @@ use bevy::{
         render_phase::{PhaseItem, RenderCommand, RenderCommandResult, TrackedRenderPass},
         render_resource::*,
         renderer::RenderDevice,
-        storage::ShaderStorageBuffer,
+        storage::ShaderBuffer,
         sync_world::MainEntity,
     },
 };
@@ -29,11 +29,11 @@ pub struct IndirectBindGroup {
 #[derive(AsBindGroup)]
 pub struct PrepassViewBindGroup {
     #[storage(0, visibility(compute), read_only)]
-    pub(crate) terrain_view: Handle<ShaderStorageBuffer>,
+    pub(crate) terrain_view: Handle<ShaderBuffer>,
     #[storage(1, visibility(compute))]
-    pub(crate) approximate_height: Handle<ShaderStorageBuffer>,
+    pub(crate) approximate_height: Handle<ShaderBuffer>,
     #[storage(2, visibility(compute), read_only)]
-    pub(crate) tile_tree: Handle<ShaderStorageBuffer>,
+    pub(crate) tile_tree: Handle<ShaderBuffer>,
     #[storage(3, visibility(compute), buffer)]
     pub(crate) final_tiles: Buffer,
     #[storage(4, visibility(compute), buffer)]
@@ -46,11 +46,11 @@ pub struct PrepassViewBindGroup {
 pub struct TerrainViewBindGroup {
     // Todo: replace with updatable uniform buffer
     #[storage(0, visibility(vertex, fragment), read_only)]
-    pub(crate) terrain_view: Handle<ShaderStorageBuffer>,
+    pub(crate) terrain_view: Handle<ShaderBuffer>,
     #[storage(1, visibility(vertex, fragment), read_only)]
-    pub(crate) approximate_height: Handle<ShaderStorageBuffer>,
+    pub(crate) approximate_height: Handle<ShaderBuffer>,
     #[storage(2, visibility(vertex, fragment), read_only)]
-    pub(crate) tile_tree: Handle<ShaderStorageBuffer>,
+    pub(crate) tile_tree: Handle<ShaderBuffer>,
     #[storage(3, visibility(vertex, fragment), read_only, buffer)]
     pub(crate) geometry_tiles: Buffer,
 }

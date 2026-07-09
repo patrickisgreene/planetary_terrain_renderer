@@ -8,7 +8,6 @@ use bevy::{
     platform::collections::HashMap,
     prelude::*,
     render::{
-        render_graph::{self, NodeRunError, RenderGraphContext, RenderLabel},
         render_resource::{binding_types::*, *},
         renderer::RenderContext,
     },
@@ -86,42 +85,25 @@ impl SpecializedComputePipeline for MipPipelines {
         ComputePipelineDescriptor {
             label: Some("mip_pipeline".into()),
             layout: vec![self.mip_layouts[&key.format].clone()],
-            push_constant_ranges: default(),
+            //push_constant_ranges: default(),
             shader: self.mip_shader.clone(),
             shader_defs: key.shader_defs(),
             entry_point: Some("main".into()),
             zero_initialize_workgroup_memory: false,
+            immediate_size: Default::default(),
         }
     }
 }
 
-#[derive(Debug, Hash, PartialEq, Eq, Clone, RenderLabel)]
-pub struct MipPrepass;
+pub(crate) fn mip_prepass(world: &World, mut ctx: RenderContext) {
+    let pipeline_cache = world.resource::<PipelineCache>();
+    let gpu_tile_atlases = world.resource::<TerrainComponents<GpuTileAtlas>>();
 
-impl render_graph::Node for MipPrepass {
-    fn run<'w>(
-        &self,
-        _graph: &mut RenderGraphContext,
-        context: &mut RenderContext<'w>,
-        world: &'w World,
-    ) -> Result<(), NodeRunError> {
-        let pipeline_cache = world.resource::<PipelineCache>();
-        let gpu_tile_atlases = world.resource::<TerrainComponents<GpuTileAtlas>>();
+    let mut pass = ctx
+        .command_encoder()
+        .begin_compute_pass(&ComputePassDescriptor::default());
 
-        context.add_command_buffer_generation_task(move |device| {
-            let mut encoder = device.create_command_encoder(&CommandEncoderDescriptor::default());
-
-            let mut pass = encoder.begin_compute_pass(&ComputePassDescriptor::default());
-
-            for gpu_tile_atlas in gpu_tile_atlases.values() {
-                gpu_tile_atlas.generate_mip(&mut pass, pipeline_cache);
-            }
-
-            drop(pass);
-
-            encoder.finish()
-        });
-
-        Ok(())
+    for gpu_tile_atlas in gpu_tile_atlases.values() {
+        gpu_tile_atlas.generate_mip(&mut pass, pipeline_cache);
     }
 }

@@ -14,7 +14,7 @@ use bevy::{
     camera::visibility::{VisibilityClass, add_visibility_class},
     platform::collections::{HashMap, HashSet},
     prelude::*,
-    render::{render_resource::*, storage::ShaderStorageBuffer},
+    render::{render_resource::*, storage::ShaderBuffer},
     tasks::Task,
 };
 use big_space::prelude::*;
@@ -74,14 +74,14 @@ pub struct TileAtlas {
     pub(crate) height_scale: f32,
     pub(crate) shape: TerrainShape,
 
-    pub(crate) terrain_buffer: Handle<ShaderStorageBuffer>,
+    pub(crate) terrain_buffer: Handle<ShaderBuffer>,
 }
 
 impl TileAtlas {
     /// Creates a new tile_tree from a terrain config.
     pub fn new(
         config: &TerrainConfig,
-        buffers: &mut Assets<ShaderStorageBuffer>,
+        buffers: &mut Assets<ShaderBuffer>,
         settings: &TerrainSettings,
     ) -> Self {
         let attachments = config
@@ -90,7 +90,7 @@ impl TileAtlas {
             .map(|(label, attachment)| (label.clone(), Attachment::new(attachment, &config.path)))
             .collect();
 
-        let terrain_buffer = buffers.add(ShaderStorageBuffer::with_size(
+        let terrain_buffer = buffers.add(ShaderBuffer::with_size(
             TerrainUniform::min_size().get() as usize,
             RenderAssetUsages::all(),
         ));
@@ -181,10 +181,10 @@ impl TileAtlas {
 
     pub fn update_terrain_buffer(
         mut tile_atlases: Query<(&mut TileAtlas, &GlobalTransform)>,
-        mut buffers: ResMut<Assets<ShaderStorageBuffer>>,
+        mut buffers: ResMut<Assets<ShaderBuffer>>,
     ) {
         for (tile_atlas, global_transform) in &mut tile_atlases {
-            let terrain_buffer = buffers.get_mut(&tile_atlas.terrain_buffer).unwrap();
+            let mut terrain_buffer = buffers.get_mut(&tile_atlas.terrain_buffer).unwrap();
             terrain_buffer.set_data(TerrainUniform::new(&tile_atlas, global_transform));
         }
     }

@@ -239,7 +239,7 @@ impl GpuAttachment {
         let atlas_sampler = device.create_sampler(&SamplerDescriptor {
             mag_filter: FilterMode::Linear,
             min_filter: FilterMode::Linear,
-            mipmap_filter: FilterMode::Linear,
+            mipmap_filter: MipmapFilterMode::Linear,
             ..default()
         });
 
@@ -301,8 +301,8 @@ impl GpuAttachment {
         pipeline_cache: &PipelineCache,
         mip_pipelines: &MipPipelines,
     ) {
-        let layout =
-            pipeline_cache.get_bind_group_layout(&mip_pipelines.mip_layouts[&self.buffer_info.format]);
+        let layout = pipeline_cache
+            .get_bind_group_layout(&mip_pipelines.mip_layouts[&self.buffer_info.format]);
 
         for (mip_level, atlas_indices) in self.mips_to_generate.iter().enumerate() {
             for atlas_index in atlas_indices {

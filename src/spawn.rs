@@ -4,7 +4,7 @@ use crate::{
     terrain_data::{TileAtlas, TileTree},
     terrain_view::{TerrainViewComponents, TerrainViewConfig},
 };
-use bevy::{ecs::system::SystemState, prelude::*, render::storage::ShaderStorageBuffer};
+use bevy::{ecs::system::SystemState, prelude::*, render::storage::ShaderBuffer};
 use big_space::floating_origins::BigSpace;
 
 #[derive(Clone)]
@@ -41,7 +41,7 @@ pub(crate) fn spawn_terrains<M: Material>(
                     Query<Entity, With<BigSpace>>,
                     ResMut<Assets<M>>,
                     ResMut<TerrainViewComponents<TileTree>>,
-                    ResMut<Assets<ShaderStorageBuffer>>,
+                    ResMut<Assets<ShaderBuffer>>,
                     Res<TerrainSettings>,
                 )>::new(world);
 
@@ -53,7 +53,7 @@ pub(crate) fn spawn_terrains<M: Material>(
                     mut tile_trees,
                     mut buffers,
                     settings,
-                ) = state.get_mut(world);
+                ) = state.get_mut(world).unwrap();
 
                 let config = configs.get(config.id()).unwrap().clone();
 
