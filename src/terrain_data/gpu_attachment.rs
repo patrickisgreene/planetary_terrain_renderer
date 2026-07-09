@@ -298,13 +298,17 @@ impl GpuAttachment {
     pub(crate) fn prepare_mip_bind_groups(
         &mut self,
         device: &RenderDevice,
+        pipeline_cache: &PipelineCache,
         mip_pipelines: &MipPipelines,
     ) {
+        let layout =
+            pipeline_cache.get_bind_group_layout(&mip_pipelines.mip_layouts[&self.buffer_info.format]);
+
         for (mip_level, atlas_indices) in self.mips_to_generate.iter().enumerate() {
             for atlas_index in atlas_indices {
                 self.mip_bind_groups[mip_level].push(device.create_bind_group(
                     None,
-                    &mip_pipelines.mip_layouts[&self.buffer_info.format],
+                    &layout,
                     &BindGroupEntries::sequential((
                         &GpuBuffer::create(device, atlas_index, BufferUsages::UNIFORM),
                         &self.mip_views[mip_level - 1],

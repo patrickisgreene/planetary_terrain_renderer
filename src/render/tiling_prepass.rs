@@ -124,10 +124,10 @@ impl TilingPrepassItem {
 
 #[derive(Resource)]
 pub struct TerrainTilingPrepassPipelines {
-    pub(crate) terrain_layout: BindGroupLayout,
-    pub(crate) terrain_view_layout: BindGroupLayout,
-    pub(crate) indirect_layout: BindGroupLayout,
-    pub(crate) prepass_view_layout: BindGroupLayout,
+    pub(crate) terrain_layout: BindGroupLayoutDescriptor,
+    pub(crate) terrain_view_layout: BindGroupLayoutDescriptor,
+    pub(crate) indirect_layout: BindGroupLayoutDescriptor,
+    pub(crate) prepass_view_layout: BindGroupLayoutDescriptor,
     prepare_prepass_shader: Handle<Shader>,
     refine_tiles_shader: Handle<Shader>,
 }
@@ -136,10 +136,10 @@ impl FromWorld for TerrainTilingPrepassPipelines {
     fn from_world(world: &mut World) -> Self {
         let device = world.resource::<RenderDevice>();
 
-        let terrain_layout = TerrainBindGroup::bind_group_layout(device);
-        let terrain_view_layout = TerrainViewBindGroup::bind_group_layout(device);
-        let indirect_layout = IndirectBindGroup::bind_group_layout(device);
-        let prepass_view_layout = PrepassViewBindGroup::bind_group_layout(device);
+        let terrain_layout = TerrainBindGroup::bind_group_layout_descriptor(device);
+        let terrain_view_layout = TerrainViewBindGroup::bind_group_layout_descriptor(device);
+        let indirect_layout = IndirectBindGroup::bind_group_layout_descriptor(device);
+        let prepass_view_layout = PrepassViewBindGroup::bind_group_layout_descriptor(device);
 
         let prepare_prepass_shader = world.load_asset(PREPARE_PREPASS_SHADER);
         let refine_tiles_shader = world.load_asset(REFINE_TILES_SHADER);

@@ -139,12 +139,13 @@ impl GpuTileAtlas {
     pub(crate) fn prepare(
         device: Res<RenderDevice>,
         queue: Res<RenderQueue>,
+        pipeline_cache: Res<PipelineCache>,
         mip_pipelines: Res<MipPipelines>,
         mut gpu_tile_atlases: ResMut<TerrainComponents<GpuTileAtlas>>,
     ) {
         for gpu_tile_atlas in gpu_tile_atlases.values_mut() {
             for attachment in gpu_tile_atlas.attachments.values_mut() {
-                attachment.prepare_mip_bind_groups(&device, &mip_pipelines);
+                attachment.prepare_mip_bind_groups(&device, &pipeline_cache, &mip_pipelines);
             }
 
             gpu_tile_atlas.upload_tiles(&queue);

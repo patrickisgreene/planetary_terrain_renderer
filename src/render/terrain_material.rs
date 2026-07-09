@@ -194,11 +194,11 @@ impl TerrainPipelineFlags {
 /// The pipeline used to render the terrain entities.
 #[derive(Resource)]
 pub struct TerrainRenderPipeline<M: Material> {
-    view_layout: BindGroupLayout,
-    view_layout_multisampled: BindGroupLayout,
-    terrain_layout: BindGroupLayout,
-    terrain_view_layout: BindGroupLayout,
-    material_layout: BindGroupLayout,
+    view_layout: BindGroupLayoutDescriptor,
+    view_layout_multisampled: BindGroupLayoutDescriptor,
+    terrain_layout: BindGroupLayoutDescriptor,
+    terrain_view_layout: BindGroupLayoutDescriptor,
+    material_layout: BindGroupLayoutDescriptor,
     vertex_shader: Handle<Shader>,
     fragment_shader: Handle<Shader>,
     marker: PhantomData<M>,
@@ -233,7 +233,7 @@ impl<M: Material> FromWorld for TerrainRenderPipeline<M> {
                 .clone(),
             terrain_layout: prepass_pipelines.terrain_layout.clone(),
             terrain_view_layout: prepass_pipelines.terrain_view_layout.clone(),
-            material_layout: M::bind_group_layout(device),
+            material_layout: M::bind_group_layout_descriptor(device),
             vertex_shader,
             fragment_shader,
             marker: PhantomData,

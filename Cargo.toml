@@ -14,14 +14,17 @@ repository = "https://github.com/kurtkuehnert/bevy_terrain"
 [workspace]
 members = ["preprocess"]
 
+[lints.rust]
+unexpected_cfgs = { level = "allow", check-cfg = ["cfg(feature, values(\"webgpu\"))"] }
 
 [dependencies]
-bevy = "0.17.3"
-bevy_common_assets = { version = "0.14.0", features = ["ron"] }
-big_space = { version = "0.11", features = ["i32"] }
+ron = "0.12"
+bevy = "0.18.1"
+bevy_common_assets = { version = "0.15.0", features = ["ron"] }
+big_space = { version = "0.12", features = ["i32"] }
 tiff = "0.10"
 bytemuck = "1.14"
-ndarray = "0.16.1"
+ndarray = "0.17"
 itertools = "0.14.0"
 bitflags = "2.4"
 serde = "1.0.210"

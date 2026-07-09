@@ -5,9 +5,7 @@ use crate::{
     math::{TerrainShape, TileCoordinate},
     terrain_data::{AttachmentConfig, AttachmentLabel},
 };
-use bevy::{
-    asset::ron, ecs::entity::hash_map::EntityHashMap, platform::collections::HashMap, prelude::*,
-};
+use bevy::{ecs::entity::hash_map::EntityHashMap, platform::collections::HashMap, prelude::*};
 use serde::{Deserialize, Serialize};
 use std::{fs, path::Path};
 

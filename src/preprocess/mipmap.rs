@@ -10,18 +10,15 @@ use bevy::{
     render::{
         render_graph::{self, NodeRunError, RenderGraphContext, RenderLabel},
         render_resource::{binding_types::*, *},
-        renderer::{RenderContext, RenderDevice},
+        renderer::RenderContext,
     },
     shader::ShaderDefVal,
 };
 use strum::IntoEnumIterator;
 
-pub(crate) fn create_mip_layout(
-    device: &RenderDevice,
-    format: AttachmentFormat,
-) -> BindGroupLayout {
-    device.create_bind_group_layout(
-        None,
+pub(crate) fn create_mip_layout(format: AttachmentFormat) -> BindGroupLayoutDescriptor {
+    BindGroupLayoutDescriptor::new(
+        "mip_bind_group_layout",
         &BindGroupLayoutEntries::sequential(
             ShaderStages::COMPUTE,
             (
@@ -62,17 +59,16 @@ impl MipPipelineKey {
 
 #[derive(Resource)]
 pub struct MipPipelines {
-    pub(crate) mip_layouts: HashMap<AttachmentFormat, BindGroupLayout>,
+    pub(crate) mip_layouts: HashMap<AttachmentFormat, BindGroupLayoutDescriptor>,
     mip_shader: Handle<Shader>,
 }
 
 impl FromWorld for MipPipelines {
     fn from_world(world: &mut World) -> Self {
-        let device = world.resource::<RenderDevice>();
         let asset_server = world.resource::<AssetServer>();
 
         let mip_layouts = AttachmentFormat::iter()
-            .map(|format| (format, create_mip_layout(device, format)))
+            .map(|format| (format, create_mip_layout(format)))
             .collect();
         let mip_shader = asset_server.load(MIP_SHADER);
 

@@ -195,17 +195,19 @@ impl FromWorld for DepthCopyPipeline {
         let device = world.resource::<RenderDevice>();
         let pipeline_cache = world.resource::<PipelineCache>();
 
-        let layout = device.create_bind_group_layout(
-            None,
-            &BindGroupLayoutEntries::sequential(
-                ShaderStages::FRAGMENT,
-                (texture_depth_2d_multisampled(),),
-            ),
+        let entries = BindGroupLayoutEntries::sequential(
+            ShaderStages::FRAGMENT,
+            (texture_depth_2d_multisampled(),),
         );
+
+        let layout = device.create_bind_group_layout(None, &entries);
 
         let id = pipeline_cache.queue_render_pipeline(RenderPipelineDescriptor {
             label: None,
-            layout: vec![layout.clone()],
+            layout: vec![BindGroupLayoutDescriptor::new(
+                "depth_copy_bind_group_layout",
+                &entries,
+            )],
             push_constant_ranges: Vec::new(),
             vertex: fullscreen.to_vertex_state(),
             fragment: Some(FragmentState {
